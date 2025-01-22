@@ -45,7 +45,7 @@ export default function Home() {
       </header>
 
       {/* Form */}
-      <form className="flex flex-col bg-transparent h-full pt-20">
+      <form  className="flex flex-col bg-transparent h-full pt-20">
         {/* Message Section */}
         <div className="flex-1 overflow-y-auto">
           <Message />
