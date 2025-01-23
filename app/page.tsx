@@ -4,11 +4,37 @@ import Image from "next/image";
 import { SettingsIcon } from 'lucide-react';
 import Message from "../component/Message";
 import Recorder, { mimeType } from "@/component/Recorder";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useFormState } from "react-dom";
+
+
+const initialState ={
+  sender:"",
+  response: "",
+  id:""
+}
 
 export default function Home() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const submitButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [state,formAction] = useFormState(transcript,initialState);
+  const [messages,setMessages]= useState<Message[]>([])
+
+  // update message when Action completes
+
+  useEffect(()=>{
+    if(state.response && state.sender ){
+      setMessages(messages =>
+        setMessages(messages=>[{
+          sender: state.sender || "",
+          response:state.response || "",
+          id:state.id || "",
+        }
+        ),
+        ...messages
+      ])
+    }
+  },[state])
 
   const uploadAudio = (blob: Blob) => {
     const file = new File([blob], 'audio.webm', { type: mimeType });
@@ -23,6 +49,8 @@ export default function Home() {
       submitButtonRef.current.click();
     }
   };
+
+  console.log(messages)
 
   return (
     <main className="bg-gradient-to-b from-gray-500 to-black h-screen overflow-hidden">
@@ -45,7 +73,7 @@ export default function Home() {
       </header>
 
       {/* Form */}
-      <form  className="flex flex-col bg-transparent h-full pt-20">
+      <form action={formAction}   className="flex flex-col bg-transparent h-full pt-20">
         {/* Message Section */}
         <div className="flex-1 overflow-y-auto">
           <Message />
