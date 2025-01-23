@@ -1,79 +1,116 @@
-'use server'
+// 'use server'
+import axios from 'axios';
 
-import { send } from "process";
-import asse
+export async function transcript(prevState: any, formData: FormData) {
+    console.log("Previous state", prevState);
+    const id = Math.random().toString(36);
 
-async function transcript(prevState:any , formData:FormData) {
-    console.log("Previous state",prevState)
-    const id = Math.random().toString(36)
-
-    if(
-        process.env.AZURE_API_KEY ===undefined ||
-        process.env.AZURE_ENDPOINT ===undefined ||
-        process.env.AZURE_DEPLOYMENT_NAME ===undefined ||
-        process.env.AZURE_DEPLOYMENT_COMPLETE_NAME ===undefined 
-    ){
-        console.error("AssemblyAI not set");
-        return{
-            sender: "",
-            response:"AssemblyAI not set"
-        }
-    }
-    console file = formData.get("audio") as File:
-    if(file.size === 0){
+    if (process.env.REV_AI_API_KEY === undefined) {
+        console.error("Rev.ai API Key is not set");
         return {
-            sender:"",
-            reponse:"NO audio file is there",
-        }
+            sender: "",
+            response: "Rev.ai API Key is not set"
+        };
     }
-    console.log(">>" , file)
 
-    const arrayBuffer = await file.arrayBuffer();
-    const audio = new UintArray(arrayBuffer);
+    const file = formData.get("audio") as File;
+    if (file.size === 0) {
+        return {
+            sender: "",
+            response: "No audio file is there",
+        };
+    }
+    console.log(">>", file);
 
-    /// get audio from whisper Ai
+    const uploadResponse = await uploadAudioToRevAI(file);
+    if (!uploadResponse || !uploadResponse.upload_url) {
+        return {
+            sender: "",
+            response: "Failed to upload audio to Rev.ai",
+        };
+    }
 
-    const client = new OpenAIClient(
-        process.env.AZURE_ENDPOINT,
-        new AzureKeyCredential(process.env.AZURE_API_KEY)
-    )
-     
-    const result = await client.getAudioTranscription(
-        process.env.AZURE_DEPLOYMENT_NAME,
-        audio
-    )
-    console.log("Transcription : ${result.text})
+    const transcriptionResult = await getTranscriptionFromRevAI(uploadResponse.upload_url);
+    if (!transcriptionResult || !transcriptionResult.text) {
+        return {
+            sender: "",
+            response: "Failed to transcribe audio",
+        };
+    }
 
-    // get chat completion
+    const resultText = transcriptionResult.text;
 
-    const messages : ChatRequestMessage[]= [
-        {
-            role:"system",
-            content:"Hello I am VoiceAssisi. You will answer the question and reply I cannot answer that if you dont know the answer"
-        },
-        {
-            role: :"user",
-            content : result.text
-        }
-    ]
-
-
-    // console.log('Messages : ${messages.map((m)=> m.content).join("\n")}')
-
-    const completion = await client.getChatCompletions(
-        process.env.AZURE_DEPLOYMENT_COMPLETION_NAME,
-        messages,
-        {maxTokens: 128}
-    )
-
-    const response = completion.choice[0].message?.content;
-    console.log(prevState.sender, "+++" , result.text)
+    const response = await getChatResponse(resultText);
 
     return {
-        sender: result.text,
+        sender: resultText,
         response: response,
         id,
+    };
+}
+
+async function uploadAudioToRevAI(file: File) {
+    const formData = new FormData();
+    formData.append("audio", file);
+
+    try {
+        const response = await axios.post('https://api.rev.ai/revspeech/v1beta/jobs', formData, {
+            headers: {
+                'Authorization': `Bearer ${process.env.REV_AI_API_KEY}`,
+                'Content-Type': 'multipart/form-data',
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error uploading audio to Rev.ai:", error);
+        return null;
     }
 }
 
-export default transcript;
+async function getTranscriptionFromRevAI(uploadUrl: string) {
+    try {
+        const response = await axios.get(`https://api.rev.ai/revspeech/v1beta/jobs/${uploadUrl}`, {
+            headers: {
+                'Authorization': `Bearer ${process.env.REV_AI_API_KEY}`,
+            }
+        });
+
+        const transcriptId = response.data.id;
+        return await pollTranscriptionResultRevAI(transcriptId);
+    } catch (error) {
+        console.error("Error fetching transcription from Rev.ai:", error);
+        return null;
+    }
+}
+
+async function pollTranscriptionResultRevAI(transcriptId: string) {
+    try {
+        let isCompleted = false;
+        let transcriptionResult = null;
+        while (!isCompleted) {
+            const response = await axios.get(`https://api.rev.ai/revspeech/v1beta/jobs/${transcriptId}`, {
+                headers: {
+                    'Authorization': `Bearer ${process.env.REV_AI_API_KEY}`,
+                }
+            });
+
+            transcriptionResult = response.data;
+            if (transcriptionResult.status === 'completed') {
+                isCompleted = true;
+            } else if (transcriptionResult.status === 'failed') {
+                throw new Error('Transcription failed');
+            } else {
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+        }
+
+        return transcriptionResult;
+    } catch (error) {
+        console.error("Error polling transcription result:", error);
+        return null;
+    }
+}
+
+async function getChatResponse(transcriptionText: string) {
+    return `I heard: ${transcriptionText}`;
+}

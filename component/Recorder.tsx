@@ -17,13 +17,12 @@ function Recorder({
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]); // Add state for audio chunks
   const mediaRecorder = useRef<MediaRecorder | null>(null);
 
-  // Set isClient to true once the component is mounted on the client
   useEffect(() => {
     setIsClient(true);
     if (typeof window !== "undefined") {
       getMicrophonePermission();
     }
-  }, []); // Ensure the effect runs only once
+  }, []);
 
   const getMicrophonePermission = async () => {
     if ("MediaRecorder" in window && navigator.mediaDevices) {
@@ -47,7 +46,6 @@ function Recorder({
 
     setRecordingStatus("recording");
 
-    // Create a new media recorder for recording
     const media = new MediaRecorder(stream, { mimeType });
     mediaRecorder.current = media;
     mediaRecorder.current.start();
@@ -71,22 +69,18 @@ function Recorder({
 
   const stopRecording = () => {
     if (mediaRecorder.current === null || recordingStatus !== "recording") return;
-
     setRecordingStatus("inactive");
-    mediaRecorder.current.stop(); // Stop the recording
+    mediaRecorder.current.stop();
   };
 
   if (!isClient) {
-    return null; // Render nothing on the server side until the client is ready
+    return null;
   }
 
   return (
     <div className="flex items-center justify-center w-full h-full">
       {!permission && (
-        <button
-          onClick={getMicrophonePermission}
-          className="bg-blue-500 text-white p-2 rounded"
-        >
+        <button onClick={getMicrophonePermission} className="bg-blue-500 text-white p-2 rounded">
           Get Microphone
         </button>
       )}
