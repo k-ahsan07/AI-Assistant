@@ -1,50 +1,33 @@
-'use client'
+"use client";
 
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { SettingsIcon } from 'lucide-react';
-import Message from "../component/Message";
-import Recorder, { mimeType } from "@/component/Recorder";
-import { useEffect, useRef, useState } from "react";
-import { useFormState } from "react-dom";
-import { transcript } from "@/actions/transcript";
-
-const initialState = {
-  sender: "",
-  response: "",
-  id: ""
-}
+import { SettingsIcon } from "lucide-react";
+import Recorder from "@/component/Recorder";
 
 export default function Home() {
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const submitButtonRef = useRef<HTMLButtonElement | null>(null);
-  const [state, formAction] = useFormState(transcript, initialState);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<string[]>([]);
+  const [transcription, setTranscription] = useState<string>("");
 
-  useEffect(() => {
-    if (state.response && state.sender) {
-      setMessages(messages =>
-        [{ sender: state.sender || "", response: state.response || "", id: state.id || "" }, ...messages]
-      );
-    }
-  }, [state]);
-
-  const uploadAudio = (blob: Blob) => {
-    const file = new File([blob], 'audio.webm', { type: mimeType });
-
-    if (fileRef.current) {
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(file);
-      fileRef.current.files = dataTransfer.files;
-    }
-
-    if (submitButtonRef.current) {
-      submitButtonRef.current.click();
-    }
+  // Function to handle audio recording and transcription
+  const transcribeAudio = async (blob: Blob) => {
+    const audioURL = URL.createObjectURL(blob);
+    console.log("Transcribing audio...");
+    await handleAudioTranscription(audioURL);
   };
 
-  console.log(messages);
-  console.log("API Key:", process.env.REV_AI_API_KEY);
+  // Updated function to handle audio transcription safely without relying on speech recognition API directly
+  const handleAudioTranscription = async (audioURL: string): Promise<void> => {
+    const audio = new Audio(audioURL);
+    audio.play();
 
+    // Placeholder for transcription logic, assuming server-based transcription API
+    audio.onended = () => {
+      console.log("Audio finished playing.");
+      // Proceed with any other actions like sending to server for transcription
+      // setTranscription("Example transcription from server API...");
+    };
+  };
 
   return (
     <main className="bg-gradient-to-b from-gray-500 to-black h-screen overflow-hidden">
@@ -65,34 +48,27 @@ export default function Home() {
         />
       </header>
 
-      <form action={formAction} className="flex flex-col bg-transparent h-full pt-20">
-        <div className="flex-1 overflow-y-auto">
-          <Message />
+      <div className="flex flex-col bg-transparent h-full pt-20">
+        <div className="flex-1 overflow-y-auto p-5 text-white">
+          <div>
+            <p className="font-bold">Real-Time Transcription:</p>
+            <p className="text-yellow-300 mt-2">{transcription || "Start speaking..."}</p>
+          </div>
+          <div className="mt-4">
+            {messages.map((msg, idx) => (
+              <div key={idx} className="mb-2">
+                {msg}
+              </div>
+            ))}
+          </div>
         </div>
-
-        <input type="file" name="audio" hidden ref={fileRef} />
-        <button type="submit" name="" hidden ref={submitButtonRef} />
 
         <div className="fixed bottom-0 w-full h-[200px] rounded-t-3xl p-5">
           <div className="flex items-center justify-center h-full">
-            <Recorder uploadAudio={uploadAudio} />
+            <Recorder uploadAudio={transcribeAudio} />
           </div>
         </div>
-      </form>
+      </div>
     </main>
   );
 }
-
-import { KokoroTTS } from "kokoro-js";
-
-const model_id = "onnx-community/Kokoro-82M-ONNX";
-const tts = await KokoroTTS.from_pretrained(model_id, {
-  dtype: "q8", // Options: "fp32", "fp16", "q8", "q4", "q4f16"
-});
-
-const text = "Life is like a box of chocolates. You never know what you're gonna get.";
-const audio = await tts.generate(text, {
-  // Use tts.list_voices() to list all available voices
-  voice: "af_bella",
-});
-audio.save("audio.wav");
