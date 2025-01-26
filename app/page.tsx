@@ -1,32 +1,69 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { SettingsIcon } from "lucide-react";
-import Recorder from "@/component/Recorder";
 
 export default function Home() {
-  const [messages, setMessages] = useState<string[]>([]);
-  const [transcription, setTranscription] = useState<string>("");
+  const [transcription, setTranscription] = useState<string>("Press start to speak...");
+  const [error, setError] = useState<string>("");
+  const [isRecording, setIsRecording] = useState<boolean>(false); // To track the recording state
 
-  // Function to handle audio recording and transcription
-  const transcribeAudio = async (blob: Blob) => {
-    const audioURL = URL.createObjectURL(blob);
-    console.log("Transcribing audio...");
-    await handleAudioTranscription(audioURL);
+  let recognition: SpeechRecognition | undefined;
+
+  const startSpeechRecognition = () => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+      if (!SpeechRecognition) {
+        setError("Speech recognition is not supported in this browser. Use Chrome or Edge.");
+        return;
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setError("");
+        setTranscription("Listening...");
+      };
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const transcript = Array.from(event.results)
+          .map((result) => result[0].transcript)
+          .join(" ");
+        setTranscription(transcript);
+        console.log("Transcription:", transcript); // Log transcription to terminal
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === "no-speech") {
+          setError("No speech detected. Please try again.");
+        } else if (event.error !== "aborted") {
+          console.error("Speech recognition error:", event.error);
+          setError("An error occurred: " + event.error);
+        }
+      };
+
+      recognition.onend = () => {
+        setTranscription("Speech recognition stopped.");
+        setError(null);
+        setIsRecording(false); // Set recording to false when it stops
+      };
+
+      recognition.start();
+      setIsRecording(true); // Set recording to true when it starts
+    }
   };
 
-  // Updated function to handle audio transcription safely without relying on speech recognition API directly
-  const handleAudioTranscription = async (audioURL: string): Promise<void> => {
-    const audio = new Audio(audioURL);
-    audio.play();
-
-    // Placeholder for transcription logic, assuming server-based transcription API
-    audio.onended = () => {
-      console.log("Audio finished playing.");
-      // Proceed with any other actions like sending to server for transcription
-      // setTranscription("Example transcription from server API...");
-    };
+  const stopSpeechRecognition = () => {
+    if (recognition) {
+      recognition.stop();
+      setIsRecording(false); // Set recording to false when stopped
+    }
   };
 
   return (
@@ -52,20 +89,24 @@ export default function Home() {
         <div className="flex-1 overflow-y-auto p-5 text-white">
           <div>
             <p className="font-bold">Real-Time Transcription:</p>
-            <p className="text-yellow-300 mt-2">{transcription || "Start speaking..."}</p>
-          </div>
-          <div className="mt-4">
-            {messages.map((msg, idx) => (
-              <div key={idx} className="mb-2">
-                {msg}
-              </div>
-            ))}
+            <p className="text-yellow-300 mt-2">{transcription}</p>
+            {error && <p className="text-red-500 mt-2">{error}</p>}
           </div>
         </div>
 
         <div className="fixed bottom-0 w-full h-[200px] rounded-t-3xl p-5">
-          <div className="flex items-center justify-center h-full">
-            <Recorder uploadAudio={transcribeAudio} />
+          <div className="flex items-center justify-center h-full space-x-4">
+            <div
+              onClick={isRecording ? stopSpeechRecognition : startSpeechRecognition}
+              className="cursor-pointer"
+            >
+              <Image
+                src={isRecording ? "/notActive.gif" : "/active.png"} // Swapped image paths
+                alt={isRecording ? "Not Recording" : "Recording"}
+                width={100}
+                height={100}
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -1,96 +1,91 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
-import Image from "next/image";
-import notActive from "../public/notActive.gif";
-import Active from "../public/active.png";
+import React, { useState, useEffect, useRef } from "react";
 
-export const mimeType = "audio/webm";
-
-function Recorder({ uploadAudio }: { uploadAudio: (blob: Blob) => void }) {
-  const [permission, setPermission] = useState(false);
-  const [recordingStatus, setRecordingStatus] = useState("inactive");
-  const mediaRecorder = useRef<MediaRecorder | null>(null);
-  const stream = useRef<MediaStream | null>(null);
+const Recorder = () => {
+  const [recordingStatus, setRecordingStatus] = useState<"inactive" | "recording">("inactive");
+  const [transcription, setTranscription] = useState<string>("Press start to speak...");
+  const [error, setError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
-    getMicrophonePermission();
+    if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
+      const SpeechRecognition = window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.lang = "en-US";
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+
+      recognitionRef.current.onresult = (event: any) => {
+        const results = event.results;
+        const latestResult = results[results.length - 1];
+        const { transcript } = latestResult[0];
+        setTranscription((prev) => `${prev} ${transcript}`);
+        console.log("Transcription:", transcript); // Log transcription to terminal
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        if (event.error === "no-speech") {
+          setError("No speech detected. Please try again.");
+        } else {
+          setError("An error occurred with speech recognition.");
+        }
+      };
+
+      recognitionRef.current.onend = () => {
+        setRecordingStatus("inactive");
+        setError(null);
+      };
+    } else {
+      setError("Speech recognition is not supported in this browser. Use Chrome or Edge.");
+    }
   }, []);
 
-  const getMicrophonePermission = async () => {
-    try {
-      const streamData = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false,
-      });
-      setPermission(true);
-      stream.current = streamData;
-    } catch (err) {
-      console.error("Error accessing microphone:", err);
+  const startRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
+      setRecordingStatus("recording");
+      setTranscription("Listening...");
+      setError(null); // Clear any previous errors
     }
   };
 
-  const startRecording = () => {
-    if (!stream.current) return;
-    setRecordingStatus("recording");
-
-    const media = new MediaRecorder(stream.current, { mimeType });
-    mediaRecorder.current = media;
-
-    const localAudioChunks: Blob[] = [];
-    mediaRecorder.current.ondataavailable = (event) => {
-      if (event.data.size > 0) localAudioChunks.push(event.data);
-    };
-
-    mediaRecorder.current.onstop = () => {
-      const blob = new Blob(localAudioChunks, { type: mimeType });
-      uploadAudio(blob); // Pass the recorded audio for transcription
-    };
-
-    mediaRecorder.current.start();
-  };
-
   const stopRecording = () => {
-    if (mediaRecorder.current && recordingStatus === "recording") {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
       setRecordingStatus("inactive");
-      mediaRecorder.current.stop();
     }
   };
 
   return (
-    <div className="flex items-center justify-center w-full h-full">
-      {!permission && (
-        <button
-          onClick={getMicrophonePermission}
-          className="bg-blue-500 text-white p-2 rounded"
-        >
-          Get Microphone
-        </button>
-      )}
-      {permission && recordingStatus === "inactive" && (
-        <Image
-          src={Active}
-          width={70}
-          height={70}
-          priority
-          alt="Start Recording"
-          className="cursor-pointer hover:scale-110 transition-all ease-in-out"
-          onClick={startRecording}
-        />
-      )}
-      {recordingStatus === "recording" && (
-        <Image
-          src={notActive}
-          width={70}
-          height={70}
-          priority
-          onClick={stopRecording}
-          className="cursor-pointer hover:scale-110 transition-all ease-in-out"
-          alt="Stop Recording"
-        />
-      )}
+    <div className="flex flex-col items-center justify-center w-full h-full text-white">
+      <div className="mb-5">
+        <p className="text-lg font-bold">Transcription:</p>
+        <p className="text-yellow-300 mt-2">{transcription}</p>
+        {error && <p className="text-red-500 mt-2">{error}</p>}
+      </div>
+
+      {/* Buttons to start and stop the speech recognition */}
+      <div className="flex space-x-4">
+        {recordingStatus === "inactive" ? (
+          <button
+            onClick={startRecording}
+            className="bg-blue-500 text-white px-6 py-3 rounded shadow-md hover:bg-blue-600 transition-all"
+          >
+            Start Speech Recognition
+          </button>
+        ) : (
+          <button
+            onClick={stopRecording}
+            className="bg-red-500 text-white px-6 py-3 rounded shadow-md hover:bg-red-600 transition-all"
+          >
+            Stop Speech Recognition
+          </button>
+        )}
+      </div>
     </div>
   );
-}
+};
 
 export default Recorder;
