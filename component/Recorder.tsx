@@ -66,7 +66,6 @@ const Recorder = () => {
         {error && <p className="text-red-500 mt-2">{error}</p>}
       </div>
 
-      {/* Buttons to start and stop the speech recognition */}
       <div className="flex space-x-4">
         {recordingStatus === "inactive" ? (
           <button

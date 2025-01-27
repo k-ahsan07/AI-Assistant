@@ -100,17 +100,18 @@ async function pollTranscriptionResultRevAI(transcriptId: string) {
             } else if (transcriptionResult.status === 'failed') {
                 throw new Error('Transcription failed');
             } else {
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                await new Promise(resolve => setTimeout(resolve, 5000)); // Poll every 5 seconds
             }
         }
-
         return transcriptionResult;
     } catch (error) {
         console.error("Error polling transcription result:", error);
         return null;
     }
-}
 
-async function getChatResponse(transcriptionText: string) {
-    return `I heard: ${transcriptionText}`;
+    return {
+        sender: result.text,
+        response : reponse,
+        id: id
+    }
 }

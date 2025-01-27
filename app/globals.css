@@ -3,12 +3,16 @@
 @tailwind utilities;
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-background text-foreground;
 }
 
-@layer components{
-  .assistant{
-    @apply h-40 w-40 object-contain
+.message {
+  @apply bg-gray-400 text-white p-4 rounded-lg;
+}
+
+@layer components {
+  .assistant {
+    @apply h-40 w-40 object-contain;
   }
 }
 

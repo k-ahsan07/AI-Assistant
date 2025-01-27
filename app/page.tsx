@@ -1,115 +1,135 @@
-"use client";
+"use client"; 
 
-import React, { useState } from "react";
-import Image from "next/image";
-import { SettingsIcon } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import MessageComponent from "../component/Message";
 
-export default function Home() {
+const API_KEY = "AIzaSyBejdt8F9PlyZ5MqLAVFzdTVBnSTmD2czU"; // Your Gemini API key
+
+const Home = () => {
+  const [recordingStatus, setRecordingStatus] = useState<"inactive" | "recording">("inactive");
   const [transcription, setTranscription] = useState<string>("Press start to speak...");
-  const [error, setError] = useState<string>("");
-  const [isRecording, setIsRecording] = useState<boolean>(false); // To track the recording state
+  const [messages, setMessages] = useState<{ sender: string; response: string; id: string }[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
 
-  let recognition: SpeechRecognition | undefined;
+  useEffect(() => {
+    if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
+      const SpeechRecognition = window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.lang = "en-US";
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
 
-  const startSpeechRecognition = () => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-      if (!SpeechRecognition) {
-        setError("Speech recognition is not supported in this browser. Use Chrome or Edge.");
-        return;
-      }
-
-      recognition = new SpeechRecognition();
-      recognition.lang = "en-US";
-      recognition.continuous = true;
-      recognition.interimResults = true;
-
-      recognition.onstart = () => {
-        setError("");
-        setTranscription("Listening...");
-      };
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = Array.from(event.results)
-          .map((result) => result[0].transcript)
-          .join(" ");
-        setTranscription(transcript);
+      recognitionRef.current.onresult = (event: any) => {
+        const results = event.results;
+        const latestResult = results[results.length - 1];
+        const { transcript } = latestResult[0];
+        setTranscription((prev) => `${prev} ${transcript}`);
         console.log("Transcription:", transcript); // Log transcription to terminal
+        getGeminiResponse(transcript); // Get Gemini API response
       };
 
-      recognition.onerror = (event) => {
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
         if (event.error === "no-speech") {
           setError("No speech detected. Please try again.");
-        } else if (event.error !== "aborted") {
-          console.error("Speech recognition error:", event.error);
-          setError("An error occurred: " + event.error);
+        } else {
+          setError("An error occurred with speech recognition.");
         }
       };
 
-      recognition.onend = () => {
-        setTranscription("Speech recognition stopped.");
+      recognitionRef.current.onend = () => {
+        setRecordingStatus("inactive");
         setError(null);
-        setIsRecording(false); // Set recording to false when it stops
       };
+    } else {
+      setError("Speech recognition is not supported in this browser. Use Chrome or Edge.");
+    }
+  }, []);
 
-      recognition.start();
-      setIsRecording(true); // Set recording to true when it starts
+  const getGeminiResponse = async (question: string) => {
+    try {
+      const response = await fetch("https://gemini-api-url-here", {  // Replace with actual URL
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${API_KEY}`,
+        },
+        body: JSON.stringify({ prompt: question }), // Ensure the body matches the expected request format
+      });
+  
+      if (!response.ok) {
+        throw new Error(`API request failed with status: ${response.status}`);
+      }
+  
+      const data = await response.json();
+  
+      // Ensure data structure is what you expect
+      console.log(data);  // Log the data to see the structure
+  
+      if (data && data.answer) {
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          { sender: "User", response: question, id: `${Date.now()}-user` },
+          { sender: "AI", response: data.answer, id: `${Date.now()}-ai` },
+        ]);
+      } else {
+        throw new Error("Invalid response format");
+      }
+    } catch (error) {
+      console.error("Error fetching Gemini API:", error);
+      setError(`An error occurred: ${error.message}`);
+    }
+  };
+  
+
+  const startRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
+      setRecordingStatus("recording");
+      setTranscription("Listening...");
+      setError(null); // Clear any previous errors
     }
   };
 
-  const stopSpeechRecognition = () => {
-    if (recognition) {
-      recognition.stop();
-      setIsRecording(false); // Set recording to false when stopped
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setRecordingStatus("inactive");
     }
   };
 
   return (
-    <main className="bg-gradient-to-b from-gray-500 to-black h-screen overflow-hidden">
-      <header className="fixed top-0 text-white p-5 w-full flex items-center justify-between z-10">
-        <div className="w-12 h-12 overflow-hidden rounded-full">
-          <Image
-            src="/ai.jpg"
-            alt="AI"
-            width={50}
-            height={50}
-            priority
-            className="object-cover"
-          />
-        </div>
-        <SettingsIcon
-          size={40}
-          className="p-2 m-2 rounded cursor-pointer bg-gray-500 text-black transition-all ease-in-out duration-150 hover:bg-gray-700 hover:text-white"
-        />
-      </header>
-
-      <div className="flex flex-col bg-transparent h-full pt-20">
-        <div className="flex-1 overflow-y-auto p-5 text-white">
-          <div>
-            <p className="font-bold">Real-Time Transcription:</p>
-            <p className="text-yellow-300 mt-2">{transcription}</p>
-            {error && <p className="text-red-500 mt-2">{error}</p>}
-          </div>
-        </div>
-
-        <div className="fixed bottom-0 w-full h-[200px] rounded-t-3xl p-5">
-          <div className="flex items-center justify-center h-full space-x-4">
-            <div
-              onClick={isRecording ? stopSpeechRecognition : startSpeechRecognition}
-              className="cursor-pointer"
-            >
-              <Image
-                src={isRecording ? "/notActive.gif" : "/active.png"} // Swapped image paths
-                alt={isRecording ? "Not Recording" : "Recording"}
-                width={100}
-                height={100}
-              />
-            </div>
-          </div>
-        </div>
+    <div className="flex flex-col items-center justify-center w-full h-full bg-gray-900 text-white p-4">
+      <div className="mb-5 w-full max-w-2xl">
+        <MessageComponent messages={messages} />
       </div>
-    </main>
+
+      <div className="mb-5 w-full max-w-2xl">
+        <p className="text-lg font-bold">Transcription:</p>
+        <p className="text-yellow-300 mt-2">{transcription}</p>
+        {error && <p className="text-red-500 mt-2">{error}</p>}
+      </div>
+
+      <div className="flex flex-col items-center space-y-4 w-full">
+        {recordingStatus === "inactive" ? (
+          <button
+            onClick={startRecording}
+            className="bg-blue-500 text-white px-6 py-3 rounded-full shadow-md hover:bg-blue-600 transition-all"
+          >
+            Start Speech Recognition
+          </button>
+        ) : (
+          <button
+            onClick={stopRecording}
+            className="bg-red-500 text-white px-6 py-3 rounded-full shadow-md hover:bg-red-600 transition-all"
+          >
+            Stop Speech Recognition
+          </button>
+        )}
+      </div>
+    </div>
   );
-}
+};
+
+export default Home;
