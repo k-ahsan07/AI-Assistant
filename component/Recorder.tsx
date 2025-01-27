@@ -21,21 +21,15 @@ const Recorder = () => {
         const latestResult = results[results.length - 1];
         const { transcript } = latestResult[0];
         setTranscription((prev) => `${prev} ${transcript}`);
-        console.log("Transcription:", transcript); // Log transcription to terminal
       };
 
       recognitionRef.current.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
-        if (event.error === "no-speech") {
-          setError("No speech detected. Please try again.");
-        } else {
-          setError("An error occurred with speech recognition.");
-        }
+        setError("Speech recognition error. Please try again.");
       };
 
       recognitionRef.current.onend = () => {
         setRecordingStatus("inactive");
-        setError(null);
       };
     } else {
       setError("Speech recognition is not supported in this browser. Use Chrome or Edge.");
@@ -47,7 +41,7 @@ const Recorder = () => {
       recognitionRef.current.start();
       setRecordingStatus("recording");
       setTranscription("Listening...");
-      setError(null); // Clear any previous errors
+      setError(null); 
     }
   };
 
@@ -59,30 +53,14 @@ const Recorder = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full h-full text-white">
-      <div className="mb-5">
-        <p className="text-lg font-bold">Transcription:</p>
-        <p className="text-yellow-300 mt-2">{transcription}</p>
-        {error && <p className="text-red-500 mt-2">{error}</p>}
-      </div>
-
-      <div className="flex space-x-4">
-        {recordingStatus === "inactive" ? (
-          <button
-            onClick={startRecording}
-            className="bg-blue-500 text-white px-6 py-3 rounded shadow-md hover:bg-blue-600 transition-all"
-          >
-            Start Speech Recognition
-          </button>
-        ) : (
-          <button
-            onClick={stopRecording}
-            className="bg-red-500 text-white px-6 py-3 rounded shadow-md hover:bg-red-600 transition-all"
-          >
-            Stop Speech Recognition
-          </button>
-        )}
-      </div>
+    <div>
+      <p>{transcription}</p>
+      {error && <p>{error}</p>}
+      {recordingStatus === "inactive" ? (
+        <button onClick={startRecording}>Start Recording</button>
+      ) : (
+        <button onClick={stopRecording}>Stop Recording</button>
+      )}
     </div>
   );
 };

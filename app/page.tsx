@@ -1,9 +1,9 @@
-"use client"; 
+"use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import MessageComponent from "../component/Message";
+import MessageComponent from "../component/Message";  
 
-const API_KEY = "AIzaSyBejdt8F9PlyZ5MqLAVFzdTVBnSTmD2czU"; // Your Gemini API key
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY || ""; 
 
 const Home = () => {
   const [recordingStatus, setRecordingStatus] = useState<"inactive" | "recording">("inactive");
@@ -25,8 +25,7 @@ const Home = () => {
         const latestResult = results[results.length - 1];
         const { transcript } = latestResult[0];
         setTranscription((prev) => `${prev} ${transcript}`);
-        console.log("Transcription:", transcript); // Log transcription to terminal
-        getGeminiResponse(transcript); // Get Gemini API response
+        getGeminiResponse(transcript);
       };
 
       recognitionRef.current.onerror = (event: any) => {
@@ -55,18 +54,15 @@ const Home = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${API_KEY}`,
         },
-        body: JSON.stringify({ prompt: question }), // Ensure the body matches the expected request format
+        body: JSON.stringify({ prompt: question }),
       });
-  
+
       if (!response.ok) {
         throw new Error(`API request failed with status: ${response.status}`);
       }
-  
+
       const data = await response.json();
-  
-      // Ensure data structure is what you expect
-      console.log(data);  // Log the data to see the structure
-  
+
       if (data && data.answer) {
         setMessages((prevMessages) => [
           ...prevMessages,
@@ -81,14 +77,13 @@ const Home = () => {
       setError(`An error occurred: ${error.message}`);
     }
   };
-  
 
   const startRecording = () => {
     if (recognitionRef.current) {
       recognitionRef.current.start();
       setRecordingStatus("recording");
       setTranscription("Listening...");
-      setError(null); // Clear any previous errors
+      setError(null); 
     }
   };
 
@@ -100,32 +95,43 @@ const Home = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full h-full bg-gray-900 text-white p-4">
-      <div className="mb-5 w-full max-w-2xl">
-        <MessageComponent messages={messages} />
+    <div className="flex flex-col items-center justify-between w-full h-full bg-gray-900 text-white p-4">
+      
+      
+      {/* Main Content */}
+      <div className="flex w-full justify-between mb-5">
+        
+        
+        {/* Left side (Transcription) */}
+        <div className="w-1/2 pr-4">
+          <p className="text-lg font-bold">Transcription:</p>
+          <p className="text-yellow-300 mt-2">{transcription}</p>
+          {error && <p className="text-red-500 mt-2">{error}</p>}
+        </div>
+
+
+
+        {/* Right side (Gemini Response) */}
+        <div className="w-1/2 pl-4">
+          <MessageComponent messages={messages} />
+        </div>
       </div>
 
-      <div className="mb-5 w-full max-w-2xl">
-        <p className="text-lg font-bold">Transcription:</p>
-        <p className="text-yellow-300 mt-2">{transcription}</p>
-        {error && <p className="text-red-500 mt-2">{error}</p>}
-      </div>
-
-      <div className="flex flex-col items-center space-y-4 w-full">
+      <div className="flex justify-center items-center w-full">
         {recordingStatus === "inactive" ? (
-          <button
+          <img
+            src="/active.png"
+            alt="Start Recording"
             onClick={startRecording}
-            className="bg-blue-500 text-white px-6 py-3 rounded-full shadow-md hover:bg-blue-600 transition-all"
-          >
-            Start Speech Recognition
-          </button>
+            className="cursor-pointer"
+          />
         ) : (
-          <button
+          <img
+            src="/notActive.gif"
+            alt="Stop Recording"
             onClick={stopRecording}
-            className="bg-red-500 text-white px-6 py-3 rounded-full shadow-md hover:bg-red-600 transition-all"
-          >
-            Stop Speech Recognition
-          </button>
+            className="cursor-pointer"
+          />
         )}
       </div>
     </div>
