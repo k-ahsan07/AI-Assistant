@@ -2,10 +2,15 @@
 
 import React, { useState, useEffect, useRef } from "react";
 
-const Recorder = () => {
+interface RecorderProps {
+  onTranscription: (transcript: string) => void;
+  onError: (error: string) => void;
+  onStart: () => void;
+  onStop: () => void;
+}
+
+const Recorder: React.FC<RecorderProps> = ({ onTranscription, onError, onStart, onStop }) => {
   const [recordingStatus, setRecordingStatus] = useState<"inactive" | "recording">("inactive");
-  const [transcription, setTranscription] = useState<string>("Press start to speak...");
-  const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
@@ -20,28 +25,28 @@ const Recorder = () => {
         const results = event.results;
         const latestResult = results[results.length - 1];
         const { transcript } = latestResult[0];
-        setTranscription((prev) => `${prev} ${transcript}`);
+        onTranscription(transcript);
       };
 
       recognitionRef.current.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
-        setError("Speech recognition error. Please try again.");
+        onError(event.error);
       };
 
       recognitionRef.current.onend = () => {
         setRecordingStatus("inactive");
+        onStop();
       };
     } else {
-      setError("Speech recognition is not supported in this browser. Use Chrome or Edge.");
+      onError("Speech recognition is not supported in this browser. Use Chrome or Edge.");
     }
-  }, []);
+  }, [onTranscription, onError, onStop]);
 
   const startRecording = () => {
     if (recognitionRef.current) {
       recognitionRef.current.start();
       setRecordingStatus("recording");
-      setTranscription("Listening...");
-      setError(null); 
+      onStart();
     }
   };
 
@@ -49,13 +54,12 @@ const Recorder = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       setRecordingStatus("inactive");
+      onStop();
     }
   };
 
   return (
     <div>
-      <p>{transcription}</p>
-      {error && <p>{error}</p>}
       {recordingStatus === "inactive" ? (
         <button onClick={startRecording}>Start Recording</button>
       ) : (
